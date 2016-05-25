@@ -56,94 +56,95 @@ var k0 = SHA256(kdf);
 // console.log(bitarray_len(k0))
 // SHA256(KDF(pwd,salt)) returns a NONRANDOM 256-bit bitarray
 
-var fakeSalt = random_bitarray(128),
-    fakePwd = 'fakefake',
-    fakeKdf = KDF(fakePwd, fakeSalt)
-    KdfConcat0 = bitarray_concat(fakeKdf, 0),
-    KdfConcat1 = bitarray_concat(fakeKdf, 1);
-console.log(bitarray_len(SHA256(fakeKdf)));
-console.log(SHA256(fakeKdf));
-console.log(bitarray_len(SHA256(KdfConcat0)));
-console.log(SHA256(KdfConcat0));
-console.log(bitarray_len(SHA256(KdfConcat1)));
-console.log(SHA256(KdfConcat1));
+
+// var fakeSalt = random_bitarray(128),
+//     fakePwd = 'fakefake',
+//     fakeKdf = KDF(fakePwd, fakeSalt)
+//     KdfConcat0 = bitarray_concat(fakeKdf, 0),
+//     KdfConcat1 = bitarray_concat(fakeKdf, 1);
+// console.log(bitarray_len(SHA256(fakeKdf)));
+// console.log(SHA256(fakeKdf));
+// console.log(bitarray_len(SHA256(KdfConcat0)));
+// console.log(SHA256(KdfConcat0));
+// console.log(bitarray_len(SHA256(KdfConcat1)));
+// console.log(SHA256(KdfConcat1));
 
 
 
-var passwordManager = {
-    salt: null,
-    HMACkey: null, //128-bit key from 256
-    AESkey: null, //128-bit key rom 256
-    setup_cipher: null,
-    passwords : {
-        //'hashedDomainName' : {
-        //    salt: 'salt',
-        //    encryptedPassword: 'pwd'
-        //}
-        // but I ended up using...
-        // 'HMAChashedDomainName' : 'aesEncryptedPassword'
-    },
-};
+// var passwordManager = {
+//     salt: null,
+//     HMACkey: null, //128-bit key from 256
+//     AESkey: null, //128-bit key rom 256
+//     setup_cipher: null,
+//     passwords : {
+//         //'hashedDomainName' : {
+//         //    salt: 'salt',
+//         //    encryptedPassword: 'pwd'
+//         //}
+//         // but I ended up using...
+//         // 'HMAChashedDomainName' : 'aesEncryptedPassword'
+//     },
+// };
 
-var managerPassword = 'test123';
-var domainName = 'google.com';
-var domainPassword = 'google123';
+// var managerPassword = 'test123';
+// var domainName = 'google.com';
+// var domainPassword = 'google123';
 
-// 1. Get the key from the password
-passwordManager['salt'] = random_bitarray(128);
+// // 1. Get the key from the password
+// passwordManager['salt'] = random_bitarray(128);
 
-// concat KDF with 0, and 1 and then SHA it to get 256, then slice it to get a 128-bit key
-passwordManager['AESkey'] = bitarray_slice(SHA256(bitarray_concat(KDF(managerPassword, passwordManager['salt']), 0)), 0, 128);
-passwordManager['HMACkey'] = bitarray_slice(SHA256(bitarray_concat(KDF(managerPassword, passwordManager['salt']), 1)), 0, 128);
-passwordManager['setup_cipher'] = setup_cipher(passwordManager['AESkey']);
-
-console.log(passwordManager);
-console.log('\n');
-
-// 2. Hash the Domain you want to save, for now it's value is plaintext
-var hashedDomain = HMAC(passwordManager['HMACkey'], domainName);
-passwordManager['passwords'][hashedDomain] = {}
+// // concat KDF with 0, and 1 and then SHA it to get 256, then slice it to get a 128-bit key
+// passwordManager['AESkey'] = bitarray_slice(SHA256(bitarray_concat(KDF(managerPassword, passwordManager['salt']), 0)), 0, 128);
+// passwordManager['HMACkey'] = bitarray_slice(SHA256(bitarray_concat(KDF(managerPassword, passwordManager['salt']), 1)), 0, 128);
+// passwordManager['setup_cipher'] = setup_cipher(passwordManager['AESkey']);
 
 // console.log(passwordManager);
 // console.log('\n');
 
-// 3. Encrypt the password
-var encryptedDomainPassword = enc_gcm(passwordManager['setup_cipher'], string_to_bitarray(domainPassword));
-passwordManager['passwords'][hashedDomain] = encryptedDomainPassword;
+// // 2. Hash the Domain you want to save, for now it's value is plaintext
+// var hashedDomain = HMAC(passwordManager['HMACkey'], domainName);
+// passwordManager['passwords'][hashedDomain] = {}
 
-// console.log(passwordManager);
-// console.log('\n');
+// // console.log(passwordManager);
+// // console.log('\n');
 
-// 4. Write a function to get a key/value in passwords
+// // 3. Encrypt the password
+// var encryptedDomainPassword = enc_gcm(passwordManager['setup_cipher'], string_to_bitarray(domainPassword));
+// passwordManager['passwords'][hashedDomain] = encryptedDomainPassword;
 
-function getPassword(domain) {
-    hashOfDomain = HMAC(passwordManager['HMACkey'], domain);
-    if (passwordManager['passwords'][hashOfDomain]) {            
-        var plainTextPassword = bitarray_to_string(dec_gcm(passwordManager['setup_cipher'], passwordManager['passwords'][hashOfDomain]));
-        // console.log(domain + ' : ' + plainTextPassword);
-    } else { 
-        // console.log(domain + ' : this pwd is not in your DB!'); 
-    }
-}
+// // console.log(passwordManager);
+// // console.log('\n');
 
-// getPassword('google.com');
-// getPassword('facebook.com');
+// // 4. Write a function to get a key/value in passwords
 
-// 5. Abstract steps 2 and 3 into a function
-function addPassword(domain, password) {
-    var hashedDomain = HMAC(passwordManager['HMACkey'], domain);
-    passwordManager['passwords'][hashedDomain] = {}
+// function getPassword(domain) {
+//     hashOfDomain = HMAC(passwordManager['HMACkey'], domain);
+//     if (passwordManager['passwords'][hashOfDomain]) {            
+//         var plainTextPassword = bitarray_to_string(dec_gcm(passwordManager['setup_cipher'], passwordManager['passwords'][hashOfDomain]));
+//         // console.log(domain + ' : ' + plainTextPassword);
+//     } else { 
+//         // console.log(domain + ' : this pwd is not in your DB!'); 
+//     }
+// }
 
-    var encryptedDomainPassword = enc_gcm(passwordManager['setup_cipher'], string_to_bitarray(password));
-    passwordManager['passwords'][hashedDomain] = encryptedDomainPassword;
-}
-// addPassword('linkedin.com', '123Linked!');
-// getPassword('linkedin.com');
+// // getPassword('google.com');
+// // getPassword('facebook.com');
+
+// // 5. Abstract steps 2 and 3 into a function
+// function addPassword(domain, password) {
+//     var hashedDomain = HMAC(passwordManager['HMACkey'], domain);
+//     passwordManager['passwords'][hashedDomain] = {}
+
+//     var encryptedDomainPassword = enc_gcm(passwordManager['setup_cipher'], string_to_bitarray(password));
+//     passwordManager['passwords'][hashedDomain] = encryptedDomainPassword;
+// }
+// // addPassword('linkedin.com', '123Linked!');
+// // getPassword('linkedin.com');
 
 
 
-// 6. Write a function to save the passwordManager as JSON
+// // 6. Write a function to save the passwordManager as JSON
 
-function saveAsJSON(passwordManager) {
-    return JSON.stringify(passwordManager);
-}
+// function saveAsJSON(passwordManager) {
+//     return JSON.stringify(passwordManager);
+// }
