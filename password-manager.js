@@ -60,9 +60,9 @@ var keychain = function() {
   keychain.init = function(password) {
     priv.data.version = "CS 255 Password Manager v1.0";
     priv.data.salt = random_bitarray(128);
-    priv.secrets.AESkey = bitarray_slice(SHA256(bitarray_concat(KDF(managerPassword, passwordManager['salt']), 0)), 0, 128);
-    priv.secrets.HMACkey = bitarray_slice(SHA256(bitarray_concat(KDF(managerPassword, passwordManager['salt']), 1)), 0, 128);
-    priv.secrets.setup_cipher = setup_cipher(passwordManager['AESkey']);
+    priv.secrets.AESkey = bitarray_slice(SHA256(bitarray_concat(KDF(password, priv.data.salt), 0)), 0, 128);
+    priv.secrets.HMACkey = bitarray_slice(SHA256(bitarray_concat(KDF(password, priv.data.salt), 1)), 0, 128);
+    priv.data.setup_cipher = setup_cipher(priv.secrets.AESkey);
     ready = true;
   };
 
@@ -83,12 +83,44 @@ var keychain = function() {
     *   trusted_data_check: string
     * Return Type: boolean
     */
-  keychain.load = function(password, repr, trusted_data_check) {
-      priv.data.version = "CS 255 Password Manager v1.0";
-      priv.data.password = password;
-      ready = true;
-      priv.secrets = JSON.parse(repr);
-  };
+  keychain.load = function(password, repr, checksum) {
+      
+      // 1. Read the JSON string of the priv obj we saved
+      var suppliedData = JSON.parse(repr);
+      var suppliedChecksum = checksum;
+
+      // // 2. If the supplied Checksum is not equal to SHA256(suppliedData), then we know data is tampered, so reject
+      // if (SHA256(suppliedData) !== suppliedChecksum) {
+      //   throw 'Data was tampered with!';
+      // }
+      // console.log('suppliedData\n')
+      // console.log(suppliedData);
+      // console.log('\n')
+
+      // // 3. Once we're sure data is good via checksum, we can check if password is correct, by comparing to AESkey. Should we compare to HMAC too??
+      var passwordHash = bitarray_slice(SHA256(bitarray_concat(KDF(password, suppliedData.data['salt']), 0)), 0, 128);
+
+      // console.log(
+      //   'is passwordHash equal to suppliedData.secrets.AESkey?',
+      //   bitarray_equal(passwordHash, suppliedData.secrets.AESkey)
+      // );
+
+      if (bitarray_equal(passwordHash, suppliedData.secrets.AESkey)) {
+        // console.log('bitArrays are equal')
+        //3a. If pwd is equal to AESkey, then set it to priv and make ready true
+        priv = suppliedData;
+        ready = true;
+        return true;
+      } else {
+
+        //3b. Else throw that password is wrong
+        return false;
+      }
+  }
+
+  keychain.display = function() {
+    return priv;
+  }
 
   /**
     * Returns a JSON serialization of the contents of the keychain that can be 
@@ -104,10 +136,11 @@ var keychain = function() {
     * Return Type: array
     */ 
   keychain.dump = function() {
-    return [
-      JSON.stringify(priv.secrets),
-      "SHA-256 Checksum, not implemented"
-    ]
+    if (ready === false) {
+      return null;
+    }
+    var dump = [ JSON.stringify(priv), SHA256(priv) ];
+    return dump;
   }
 
   /**
@@ -122,11 +155,18 @@ var keychain = function() {
     */
   keychain.get = function(name) {
     if (ready === false) throw "Manager not ready";
-    if (priv.secrets[name]) {
-      return priv.secrets[name]
-    } else {
-      return null;
+
+    console.log('.get priv.secrets', '\n', priv.secrets)
+    var hashOfDomain = HMAC(priv.secrets.HMACkey, name);
+    console.log('.get hashOfDomain: ', hashOfDomain);
+
+    if (priv.secrets[hashOfDomain]) {            
+        var plainTextPassword = bitarray_to_string(dec_gcm(priv.data.setup_cipher, priv.secrets[hashOfDomain]));
+        return plainTextPassword;
+    } else { 
+        return null;
     }
+
   }
 
   /** 
@@ -141,7 +181,13 @@ var keychain = function() {
   * Return Type: void
   */
   keychain.set = function(name, value) {
-    priv.secrets[name] = value;
+
+    var hashedDomain = HMAC(priv.secrets.HMACkey, name);
+    var encryptedDomainPassword = enc_gcm(priv.data.setup_cipher, string_to_bitarray(value));
+    
+    priv.secrets[hashedDomain] = encryptedDomainPassword;
+
+    return undefined;
   }
 
   /**
@@ -154,11 +200,16 @@ var keychain = function() {
     * Return Type: boolean
   */
   keychain.remove = function(name) {
-    if (ready === false) throw "Manager not ready";
-    if (priv.secrets[name]) {
-      delete priv.secrets[name];
-      return true;
-    } else { return false; }
+    if (ready === false) { throw "Manager not ready"; }
+    
+    var hashOfDomain = HMAC(priv.secrets.HMACkey, name);
+    
+    if (priv.secrets[hashOfDomain]) {            
+        delete priv.secrets[hashOfDomain];
+        return true;
+    } else { 
+        return false
+    }
   }
 
   return keychain;
