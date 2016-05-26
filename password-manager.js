@@ -58,7 +58,7 @@ var keychain = function() {
     * Return Type: void
     */
   keychain.init = function(password) {
-    priv.data.version = "CS 255 Password Manager v1.0";
+    priv.data.version = "Roneesh\'s Rad Passwords";
     priv.data.salt = random_bitarray(128);
     
     //concatenating 0 onto KDF output via bitarray_concat
@@ -88,6 +88,13 @@ var keychain = function() {
     */
   keychain.load = function(password, repr, checksum) {
       
+      var cksumOfRepr = bitarray_to_base64(SHA256(string_to_bitarray(repr)))
+
+      if (cksumOfRepr === checksum) {
+        console.log('Data is good!');
+      } else {
+        console.log('Data is bad!');
+      }
       // 1. Read the JSON string of the priv obj we saved
       var suppliedData = JSON.parse(repr);
       var suppliedChecksum = checksum;
@@ -97,13 +104,13 @@ var keychain = function() {
       suppliedData.data.setup_cipher = setup_cipher(suppliedData.data.AESkey);
 
       // // 2. If the supplied Checksum is not equal to SHA256(suppliedData), then we know data is tampered, so reject
-      // if (SHA256(suppliedData) !== suppliedChecksum) {
-      //   throw 'Data was tampered with!';
-      // }
 
       // // 3. Once we're sure data is good via checksum, we can check if password is correct by comparing to some other word.
-
-      var passwordCheck = bitarray_to_string(dec_gcm(suppliedData.data.setup_cipher, base64_to_bitarray(suppliedData.data.passwordCheck)));
+      try {
+        var passwordCheck = bitarray_to_string(dec_gcm(suppliedData.data.setup_cipher, base64_to_bitarray(suppliedData.data.passwordCheck)));
+      } catch(e) {
+        return false;
+      }
 
       if (passwordCheck === 'test') {
         //3a. If pwd is equal to AESkey, then set it to priv and make ready true
@@ -136,11 +143,11 @@ var keychain = function() {
       return null;
     }
     var preppedDump = JSON.parse(JSON.stringify(priv));
-    preppedDump.data.AESkey = null;
-    preppedDump.data.HMACkey = null;
-    preppedDump.data.setup_cipher = null;
+    delete preppedDump.data.AESkey;
+    delete preppedDump.data.HMACkey;
+    delete preppedDump.data.setup_cipher;
     
-    return [ JSON.stringify(preppedDump), SHA256(preppedDump) ];
+    return [ JSON.stringify(preppedDump), bitarray_to_base64(SHA256(string_to_bitarray(JSON.stringify(preppedDump)))) ];
     
   }
 

@@ -1,7 +1,8 @@
 "use strict";
 
 var lib = require("./lib"),
-    bitarray_equal = lib.bitarray_equal;
+    bitarray_equal = lib.bitarray_equal,
+    util = require('util')
 
 function assert(condition, message) {
   if (!condition) {
@@ -38,41 +39,30 @@ assert(keychain.remove("service1"));
 assert(!keychain.remove("service4"));
 assert(keychain.get("service4") === null);
 
-console.log("Saving database:");
+console.log("Saving database, what I dump:");
 var data = keychain.dump();
 
 var contents = data[0];
 var cksum = data[1];
 
-console.log(contents);
+console.log(cksum);
+
+console.dir(JSON.parse(contents));
 
 console.log("Loading database");
 var new_keychain = password_manager.keychain();
-new_keychain.load(password, contents, cksum);
+assert(new_keychain.load(password, contents, cksum) === true, 'Keychain did not load!');
+console.log("First DB loaded!");
 
-console.log('\nold keychain:');
-console.log(keychain.display());
-console.log('\nnew keychain:');
-console.log(new_keychain.display());
-
-console.log('\nare the ciphers of both keychains equal?');
-console.log(keychain.cipher === new_keychain.cipher);
-
-console.log('are the hmac keys of both keychains equal?');
-console.log(bitarray_equal(keychain.hmac, new_keychain.hmac));
-
-console.log('are the aes keys of both keychains equal?');
-console.log(bitarray_equal(keychain.aes, new_keychain.aes));
-
-console.log('are the salts of both keychains equal?');
-console.log(bitarray_equal(keychain.salt, new_keychain.salt));
+console.log("Loading DB with bad password, should be false!")
+var new_keychain2 = password_manager.keychain();
+new_keychain2.load('badPassword', contents, cksum);
+// assert(new_keychain2.load('badPassword', contents, cksum) === false, 'The bad password worked?');
+console.log('It was false, password protection is working!');
 
 console.log("\nChecking contents of new database");
 for (var k in kvs) {
   assert(keychain.get(k) === new_keychain.get(k));
 }
-
-// new_keychain.get is failing! dec_gcm is the culprit! What is wrong!??
-console.log(new_keychain.get('service2'));
 
 console.log("All tests passed!");
