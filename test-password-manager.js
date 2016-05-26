@@ -44,7 +44,7 @@ var data = keychain.dump();
 var contents = data[0];
 var cksum = data[1];
 
-// console.log(contents);
+console.log(contents);
 
 console.log("Loading database");
 var new_keychain = password_manager.keychain();

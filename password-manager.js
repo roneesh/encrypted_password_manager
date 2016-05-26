@@ -62,10 +62,10 @@ var keychain = function() {
     priv.data.salt = random_bitarray(128);
     
     //concatenating 0 onto KDF output via bitarray_concat
-    priv.secrets.AESkey = bitarray_slice(SHA256(bitarray_concat(KDF(password, priv.data.salt), 0)), 0, 128);
-    priv.secrets.HMACkey = bitarray_slice(SHA256(bitarray_concat(KDF(password, priv.data.salt), 1)), 0, 128);
-    
-    priv.data.setup_cipher = setup_cipher(priv.secrets.AESkey);
+    priv.data.AESkey = bitarray_slice(SHA256(bitarray_concat(KDF(password, priv.data.salt), 0)), 0, 128);
+    priv.data.HMACkey = bitarray_slice(SHA256(bitarray_concat(KDF(password, priv.data.salt), 1)), 0, 128);
+    priv.data.setup_cipher = setup_cipher(priv.data.AESkey);
+    priv.data.passwordCheck = bitarray_to_base64(enc_gcm(priv.data.setup_cipher, string_to_bitarray('test')));
     ready = true;
   };
 
@@ -91,20 +91,23 @@ var keychain = function() {
       // 1. Read the JSON string of the priv obj we saved
       var suppliedData = JSON.parse(repr);
       var suppliedChecksum = checksum;
+      
+      suppliedData.data.AESkey = bitarray_slice(SHA256(bitarray_concat(KDF(password, suppliedData.data.salt), 0)), 0, 128);
+      suppliedData.data.HMACkey = bitarray_slice(SHA256(bitarray_concat(KDF(password, suppliedData.data.salt), 1)), 0, 128);
+      suppliedData.data.setup_cipher = setup_cipher(suppliedData.data.AESkey);
 
       // // 2. If the supplied Checksum is not equal to SHA256(suppliedData), then we know data is tampered, so reject
       // if (SHA256(suppliedData) !== suppliedChecksum) {
       //   throw 'Data was tampered with!';
       // }
 
-      // // 3. Once we're sure data is good via checksum, we can check if password is correct, by comparing to AESkey. Should we compare to HMAC too??
-      var passwordHash = bitarray_slice(SHA256(bitarray_concat(KDF(password, suppliedData.data['salt']), 0)), 0, 128);
+      // // 3. Once we're sure data is good via checksum, we can check if password is correct by comparing to some other word.
 
-      if (bitarray_equal(passwordHash, suppliedData.secrets.AESkey)) {
+      var passwordCheck = bitarray_to_string(dec_gcm(suppliedData.data.setup_cipher, base64_to_bitarray(suppliedData.data.passwordCheck)));
 
+      if (passwordCheck === 'test') {
         //3a. If pwd is equal to AESkey, then set it to priv and make ready true
         priv = suppliedData;
-        priv.data.setup_cipher = setup_cipher(priv.secrets.AESkey);
         ready = true;
         return true;
       
@@ -132,8 +135,13 @@ var keychain = function() {
     if (ready === false) {
       return null;
     }
-    var dump = [ JSON.stringify(priv), SHA256(priv) ];
-    return dump;
+    var preppedDump = JSON.parse(JSON.stringify(priv));
+    preppedDump.data.AESkey = null;
+    preppedDump.data.HMACkey = null;
+    preppedDump.data.setup_cipher = null;
+    
+    return [ JSON.stringify(preppedDump), SHA256(preppedDump) ];
+    
   }
 
   /**
@@ -150,7 +158,7 @@ var keychain = function() {
     if (ready === false) throw "Manager not ready";
 
     // 1. hash the domain we want to check for    
-    var hashOfDomain = bitarray_to_base64(HMAC(priv.secrets.HMACkey, name));
+    var hashOfDomain = bitarray_to_base64(HMAC(priv.data.HMACkey, name));
     
     // 2. If that domain is in priv.secrets then decrypt the value of priv.secrets.hashOfDomain    
     if (priv.secrets[hashOfDomain]) {    
@@ -175,7 +183,7 @@ var keychain = function() {
   */
   keychain.set = function(name, value) {
 
-    var hashedDomain = bitarray_to_base64(HMAC(priv.secrets.HMACkey, name));
+    var hashedDomain = bitarray_to_base64(HMAC(priv.data.HMACkey, name));
     var encryptedDomainPassword = bitarray_to_base64(enc_gcm(priv.data.setup_cipher, string_to_bitarray(value)));
     
     priv.secrets[hashedDomain] = encryptedDomainPassword;
@@ -195,7 +203,7 @@ var keychain = function() {
   keychain.remove = function(name) {
     if (ready === false) { throw "Manager not ready"; }
     
-    var hashOfDomain = bitarray_to_base64(HMAC(priv.secrets.HMACkey, name));
+    var hashOfDomain = bitarray_to_base64(HMAC(priv.data.HMACkey, name));
     
     if (priv.secrets[hashOfDomain]) {            
         delete priv.secrets[hashOfDomain];
