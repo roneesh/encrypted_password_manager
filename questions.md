@@ -6,7 +6,7 @@
 
 3. Couldn't we just develop a 129-bit key then, and then use bits 0-128 for HMAC and 1-129 for AES? Do we just avoid that due to overlap? Also I guess bits are easy to
 
-2. Is this a proper implementation of K || 0, K || 1, etc?
+2. Is this a proper implementation of key concatenatio? K || 0, K || 1, etc?
 passwordManager['AESkey'] = bitarray_slice(SHA256(bitarray_concat(KDF(managerPassword, passwordManager['salt']), 0)), 0, 128);
 
 1. What in JSON.stringify could change the data so decrypting would fail? My checksum in the keychain.load is failing, does that indicate that the JSON.parse is not returning the data to its original state?

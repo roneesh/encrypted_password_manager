@@ -27,9 +27,6 @@ for (var k in kvs) {
   keychain.set(k, kvs[k]);
 }
 
-// console.log('keychain.display()')
-// console.log(keychain.display());
-
 console.log("Testing get");
 for (var k in kvs) {
   assert(keychain.get(k) === kvs[k], ("Get failed for key " + k));
@@ -53,11 +50,13 @@ console.log("Loading database");
 var new_keychain = password_manager.keychain();
 new_keychain.load(password, contents, cksum);
 
+console.log('\nold keychain:');
 console.log(keychain.display());
+console.log('\nnew keychain:');
 console.log(new_keychain.display());
 
-console.log('are the ciphers of both keychains equal?');
-console.log(bitarray_equal(keychain.cipher, new_keychain.cipher));
+console.log('\nare the ciphers of both keychains equal?');
+console.log(keychain.cipher === new_keychain.cipher);
 
 console.log('are the hmac keys of both keychains equal?');
 console.log(bitarray_equal(keychain.hmac, new_keychain.hmac));
@@ -65,7 +64,10 @@ console.log(bitarray_equal(keychain.hmac, new_keychain.hmac));
 console.log('are the aes keys of both keychains equal?');
 console.log(bitarray_equal(keychain.aes, new_keychain.aes));
 
-console.log("Checking contents of new database");
+console.log('are the salts of both keychains equal?');
+console.log(bitarray_equal(keychain.salt, new_keychain.salt));
+
+console.log("\nChecking contents of new database");
 for (var k in kvs) {
   assert(keychain.get(k) === new_keychain.get(k));
 }

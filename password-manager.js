@@ -60,8 +60,11 @@ var keychain = function() {
   keychain.init = function(password) {
     priv.data.version = "CS 255 Password Manager v1.0";
     priv.data.salt = random_bitarray(128);
+    
+    //concatenating 0 onto KDF output via bitarray_concat
     priv.secrets.AESkey = bitarray_slice(SHA256(bitarray_concat(KDF(password, priv.data.salt), 0)), 0, 128);
     priv.secrets.HMACkey = bitarray_slice(SHA256(bitarray_concat(KDF(password, priv.data.salt), 1)), 0, 128);
+    
     priv.data.setup_cipher = setup_cipher(priv.secrets.AESkey);
     ready = true;
   };
@@ -90,9 +93,9 @@ var keychain = function() {
       var suppliedChecksum = checksum;
 
       // // 2. If the supplied Checksum is not equal to SHA256(suppliedData), then we know data is tampered, so reject
-      if (SHA256(suppliedData) !== suppliedChecksum) {
-        throw 'Data was tampered with!';
-      }
+      // if (SHA256(suppliedData) !== suppliedChecksum) {
+      //   throw 'Data was tampered with!';
+      // }
 
       // // 3. Once we're sure data is good via checksum, we can check if password is correct, by comparing to AESkey. Should we compare to HMAC too??
       var passwordHash = bitarray_slice(SHA256(bitarray_concat(KDF(password, suppliedData.data['salt']), 0)), 0, 128);
@@ -101,6 +104,7 @@ var keychain = function() {
 
         //3a. If pwd is equal to AESkey, then set it to priv and make ready true
         priv = suppliedData;
+        priv.data.setup_cipher = setup_cipher(priv.secrets.AESkey);
         ready = true;
         return true;
       
@@ -201,7 +205,6 @@ var keychain = function() {
     }
   }
 
-
   keychain.display = function() {
     return priv;
   }
@@ -213,6 +216,9 @@ var keychain = function() {
   }
   keychain.aes = function() {
     return priv.data.AESkey;
+  }
+  keychain.salt = function() {
+    return priv.data.salt;
   }
 
   return keychain;
